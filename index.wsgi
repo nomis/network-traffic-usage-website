@@ -5,6 +5,7 @@ import collections
 import psycopg2.extras
 import psycopg2.pool
 import pytz
+import time
 import tzlocal
 import webob
 import yaml
@@ -105,15 +106,35 @@ def output_usage(doc, view):
 			attrs = { "name": u"–".join(filter(None, [period.start_name, period.end_name])) }
 			attrs["from"] = period.start_ts.isoformat()
 			attrs["to"] = period.end_ts.isoformat()
-
-			c.execute("SELECT sum(bp.rx_bytes) AS rx_bytes, sum(bp.tx_bytes) AS tx_bytes FROM bp_stats bp"
-				+ " WHERE intf = (SELECT id FROM intf_name WHERE name=%(device)s) AND start >= %(start)s AND start < %(stop)s AND stop <= %(stop)s",
+			now = time.time()
+			c.execute("SELECT"
+				+ " floor(sum(bp.rx_bytes"
+					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * rx_bytes ELSE 0 END)"
+					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * rx_bytes ELSE 0 END)"
+					+ "))::bigint AS rx_bytes"
+				+ ", floor(sum(bp.tx_bytes"
+					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * tx_bytes ELSE 0 END)"
+					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * tx_bytes ELSE 0 END)"
+					+ "))::bigint AS tx_bytes"
+				+ ", floor(sum(bp.rx_packets"
+					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * rx_packets ELSE 0 END)"
+					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * rx_packets ELSE 0 END)"
+					+ "))::bigint AS rx_packets"
+				+ ", floor(sum(bp.tx_packets"
+					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * tx_packets ELSE 0 END)"
+					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * tx_packets ELSE 0 END)"
+					+ "))::bigint AS tx_packets"
+				+ " FROM bp_stats bp"
+				+ " WHERE intf = (SELECT id FROM intf_name WHERE name=%(device)s) "
+				+ " AND ((start >= %(start)s and start < %(start)s) or (stop >= %(start)s and stop < %(stop)s))",
 				{ "device": view.device, "start": period.start_ts, "stop": period.end_ts })
+			duration = time.time() - now
 			bp = c.fetchone()
 			if bp["rx_bytes"] is not None:
 				attrs["rx_bytes"] = str(bp["rx_bytes"])
 			if bp["tx_bytes"] is not None:
 				attrs["tx_bytes"] = str(bp["tx_bytes"])
+			attrs["query_time"] = str(duration)
 
 			doc.startElement("period", attrs)
 			doc.endElement("period")
