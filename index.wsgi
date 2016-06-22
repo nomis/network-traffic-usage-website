@@ -101,40 +101,50 @@ def output_usage(doc, view):
 	try:
 		c = db.cursor()
 
-		doc.startElement("periods", { "type": view.period_type })
+		start_periods = [period.start_ts for period in view.periods]
+		end_periods = [period.end_ts for period in view.periods]
+		now = time.time()
+		c.execute("SELECT"
+			+ " period.start"
+			+ ", floor(sum(bp.rx_bytes"
+					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * rx_bytes ELSE 0 END)"
+					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * rx_bytes ELSE 0 END)"
+					+ "))::bigint AS rx_bytes"
+				+ ", floor(sum(bp.tx_bytes"
+					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * tx_bytes ELSE 0 END)"
+					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * tx_bytes ELSE 0 END)"
+					+ "))::bigint AS tx_bytes"
+				+ ", floor(sum(bp.rx_packets"
+					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * rx_packets ELSE 0 END)"
+					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * rx_packets ELSE 0 END)"
+					+ "))::bigint AS rx_packets"
+				+ ", floor(sum(bp.tx_packets"
+					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * tx_packets ELSE 0 END)"
+					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * tx_packets ELSE 0 END)"
+					+ "))::bigint AS tx_packets"
+				+ " FROM bp_stats bp, unnest(%(start)s, %(stop)s) AS period(start, stop)"
+				+ " WHERE intf = (SELECT id FROM intf_name WHERE name=%(device)s) "
+				+ " AND ((bp.start >= period.start and bp.start < period.start) or (bp.stop >= period.start and bp.stop < period.stop))"
+				+ " GROUP BY period.start"
+				+ " ORDER BY period.start",
+				{ "device": view.device, "start": start_periods, "stop": end_periods })
+		duration = time.time() - now
+		bp = c.fetchall()
+
+		doc.startElement("periods", { "type": view.period_type, "query_time": str(duration) })
+
+		pos = 0
 		for period in view.periods:
 			attrs = { "name": u"–".join(filter(None, [period.start_name, period.end_name])) }
 			attrs["from"] = period.start_ts.isoformat()
 			attrs["to"] = period.end_ts.isoformat()
-			now = time.time()
-			c.execute("SELECT"
-				+ " floor(sum(bp.rx_bytes"
-					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * rx_bytes ELSE 0 END)"
-					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * rx_bytes ELSE 0 END)"
-					+ "))::bigint AS rx_bytes"
-				+ ", floor(sum(bp.tx_bytes"
-					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * tx_bytes ELSE 0 END)"
-					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * tx_bytes ELSE 0 END)"
-					+ "))::bigint AS tx_bytes"
-				+ ", floor(sum(bp.rx_packets"
-					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * rx_packets ELSE 0 END)"
-					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * rx_packets ELSE 0 END)"
-					+ "))::bigint AS rx_packets"
-				+ ", floor(sum(bp.tx_packets"
-					+ "+ (CASE WHEN start < %(start)s THEN extract(epoch from (stop - %(start)s))/extract(epoch from (stop - start)) * tx_packets ELSE 0 END)"
-					+ "+ (CASE WHEN stop > %(stop)s THEN extract(epoch from (stop - %(stop)s))/extract(epoch from (stop - start)) * tx_packets ELSE 0 END)"
-					+ "))::bigint AS tx_packets"
-				+ " FROM bp_stats bp"
-				+ " WHERE intf = (SELECT id FROM intf_name WHERE name=%(device)s) "
-				+ " AND ((start >= %(start)s and start < %(start)s) or (stop >= %(start)s and stop < %(stop)s))",
-				{ "device": view.device, "start": period.start_ts, "stop": period.end_ts })
-			duration = time.time() - now
-			bp = c.fetchone()
-			if bp["rx_bytes"] is not None:
-				attrs["rx_bytes"] = str(bp["rx_bytes"])
-			if bp["tx_bytes"] is not None:
-				attrs["tx_bytes"] = str(bp["tx_bytes"])
-			attrs["query_time"] = str(duration)
+
+			if len(bp) > pos and bp[pos]["start"] == period.start_ts:
+				if bp[pos]["rx_bytes"] is not None:
+					attrs["rx_bytes"] = str(bp[pos]["rx_bytes"])
+				if bp[pos]["tx_bytes"] is not None:
+					attrs["tx_bytes"] = str(bp[pos]["tx_bytes"])
+				pos += 1
 
 			doc.startElement("period", attrs)
 			doc.endElement("period")
