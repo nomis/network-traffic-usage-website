@@ -5,15 +5,18 @@ import collections
 import psycopg2.extras
 import psycopg2.pool
 import pytz
+import re
 import time
 import tzlocal
 import webob
+import webob.exc
 import yaml
 
 with open("config", "r") as f:
 	config = yaml.safe_load(f)
 
 tz = tzlocal.get_localzone()
+date_re = re.compile(r"[0-9]*")
 
 max_pool = 20
 
@@ -45,10 +48,10 @@ class View:
 			self.device = uri[0]
 			self.date = uri[1]
 		else:
-			raise RuntimeError
+			raise webob.exc.HTTPNotFound("Invalid URI")
 
-		if len(self.date) not in [0, 4, 6, 8]:
-			raise RuntimeError
+		if len(self.date) not in [0, 4, 6, 8] or not date_re.match(self.date):
+			raise webob.exc.HTTPNotFound("Invalid date format")
 
 		if not self.date:
 			self.date = "{0:04d}".format(datetime.now().year)
@@ -92,83 +95,93 @@ class View:
 				self.periods.append(Period(local_start.strftime("%H:%M"), (local_end - timedelta(milliseconds=1)).strftime("%H:%M"), local_start, local_end))
 				start += timedelta(hours=1)
 
-def output_usage(doc, view):
-	doc.startElement("usage", { "name": view.name })
-	if view.parent:
-		doc.startElement("parent", { "name": view.parent["name"], "uri": view.parent["uri"] })
-		doc.endElement("parent")
-	db = getconn(pool, max_pool)
-	try:
-		c = db.cursor()
+class Usage:
+	def __init__(self, view):
+		self.view = view
+		db = getconn(pool, max_pool)
+		try:
+			c = db.cursor()
 
-		start_periods = [period.start_ts for period in view.periods]
-		end_periods = [period.end_ts for period in view.periods]
-		now = time.time()
-		c.execute("SELECT"
-			+ " period.start"
-			+ ", floor(sum(bp.rx_bytes"
-					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * rx_bytes ELSE 0 END)"
-					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * rx_bytes ELSE 0 END)"
-					+ "))::bigint AS rx_bytes"
-				+ ", floor(sum(bp.tx_bytes"
-					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * tx_bytes ELSE 0 END)"
-					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * tx_bytes ELSE 0 END)"
-					+ "))::bigint AS tx_bytes"
-				+ ", floor(sum(bp.rx_packets"
-					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * rx_packets ELSE 0 END)"
-					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * rx_packets ELSE 0 END)"
-					+ "))::bigint AS rx_packets"
-				+ ", floor(sum(bp.tx_packets"
-					+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * tx_packets ELSE 0 END)"
-					+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * tx_packets ELSE 0 END)"
-					+ "))::bigint AS tx_packets"
-				+ " FROM bp_stats bp, unnest(%(start)s, %(stop)s) AS period(start, stop)"
-				+ " WHERE intf = (SELECT id FROM intf_name WHERE name=%(device)s) "
-				+ " AND ((bp.start >= period.start and bp.start < period.start) or (bp.stop >= period.start and bp.stop < period.stop))"
-				+ " GROUP BY period.start"
-				+ " ORDER BY period.start",
-				{ "device": view.device, "start": start_periods, "stop": end_periods })
-		duration = time.time() - now
-		bp = c.fetchall()
+			start_periods = [period.start_ts for period in view.periods]
+			end_periods = [period.end_ts for period in view.periods]
+			now = time.time()
+			c.execute("SELECT id FROM intf_name WHERE name=%s", (view.device,))
+			if not c.rowcount:
+				raise webob.exc.HTTPNotFound("No such device")
+			c.execute("SELECT"
+				+ " period.start"
+				+ ", floor(sum(bp.rx_bytes"
+						+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * rx_bytes ELSE 0 END)"
+						+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * rx_bytes ELSE 0 END)"
+						+ "))::bigint AS rx_bytes"
+					+ ", floor(sum(bp.tx_bytes"
+						+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * tx_bytes ELSE 0 END)"
+						+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * tx_bytes ELSE 0 END)"
+						+ "))::bigint AS tx_bytes"
+					+ ", floor(sum(bp.rx_packets"
+						+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * rx_packets ELSE 0 END)"
+						+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * rx_packets ELSE 0 END)"
+						+ "))::bigint AS rx_packets"
+					+ ", floor(sum(bp.tx_packets"
+						+ "+ (CASE WHEN bp.start < period.start THEN extract(epoch from (bp.stop - period.start))/extract(epoch from (bp.stop - bp.start)) * tx_packets ELSE 0 END)"
+						+ "+ (CASE WHEN bp.stop > period.stop THEN extract(epoch from (bp.stop - period.stop))/extract(epoch from (bp.stop - bp.start)) * tx_packets ELSE 0 END)"
+						+ "))::bigint AS tx_packets"
+					+ " FROM bp_stats bp, unnest(%(start)s, %(stop)s) AS period(start, stop)"
+					+ " WHERE intf = (SELECT id FROM intf_name WHERE name=%(device)s) "
+					+ " AND ((bp.start >= period.start and bp.start < period.start) or (bp.stop >= period.start and bp.stop < period.stop))"
+					+ " GROUP BY period.start"
+					+ " ORDER BY period.start",
+					{ "device": view.device, "start": start_periods, "stop": end_periods })
+			self.query_time = time.time() - now
+			self.bp = c.fetchall()
 
-		doc.startElement("periods", { "type": view.period_type, "query_time": str(duration) })
+			c.close()
+			db.commit()
+		finally:
+			pool.putconn(db)
 
+	def output(self, doc):
+		doc.startElement("usage", { "name": self.view.name })
+		if self.view.parent:
+			doc.startElement("parent", { "name": self.view.parent["name"], "uri": self.view.parent["uri"] })
+			doc.endElement("parent")
+
+		doc.startElement("periods", { "type": self.view.period_type, "query_time": str(self.query_time) })
 		pos = 0
-		for period in view.periods:
+		for period in self.view.periods:
 			attrs = { "name": u"–".join(filter(None, [period.start_name, period.end_name])) }
 			attrs["from"] = period.start_ts.isoformat()
 			attrs["to"] = period.end_ts.isoformat()
 
-			if len(bp) > pos and bp[pos]["start"] == period.start_ts:
-				if bp[pos]["rx_bytes"] is not None:
-					attrs["rx_bytes"] = str(bp[pos]["rx_bytes"])
-				if bp[pos]["tx_bytes"] is not None:
-					attrs["tx_bytes"] = str(bp[pos]["tx_bytes"])
+			if len(self.bp) > pos and self.bp[pos]["start"] == period.start_ts:
+				if self.bp[pos]["rx_bytes"] is not None:
+					attrs["rx_bytes"] = str(self.bp[pos]["rx_bytes"])
+				if self.bp[pos]["tx_bytes"] is not None:
+					attrs["tx_bytes"] = str(self.bp[pos]["tx_bytes"])
 				pos += 1
 
 			doc.startElement("period", attrs)
 			doc.endElement("period")
 
 		doc.endElement("periods")
-
-		c.close()
-		db.commit()
-	finally:
-		pool.putconn(db)
-	doc.endElement("usage")
+		doc.endElement("usage")
 
 def application(environ, start_response):
-	req = webob.Request(environ)
-	res = webob.Response(content_type="application/xml")
+	try:
+		req = webob.Request(environ)
+		res = webob.Response(content_type="application/xml")
 
-	uri = req.environ["REQUEST_URI"]
+		uri = req.environ["REQUEST_URI"]
+		usage = Usage(View(uri))
 
-	f = res.body_file
-	doc = XMLGenerator(f, "UTF-8")
-	doc.startDocument()
-#	f.write('<?xml-stylesheet type="text/xsl" href="traffic.xsl"?>\n'.encode("UTF-8"))
-	doc.startElement("traffic", {})
-	output_usage(doc, View(uri))
-	doc.endElement("traffic")
+		f = res.body_file
+		doc = XMLGenerator(f, "UTF-8")
+		doc.startDocument()
+		f.write('<?xml-stylesheet type="text/xsl" href="/traffic.xsl"?>\n'.encode("UTF-8"))
+		doc.startElement("traffic", {})
+		usage.output(doc)
+		doc.endElement("traffic")
 
-	return res(environ, start_response)
+		return res(environ, start_response)
+	except webob.exc.HTTPException, e:
+		return e(environ, start_response)
