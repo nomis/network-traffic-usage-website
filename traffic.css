@@ -6,7 +6,7 @@ th, td { border: thin inset grey; }
 td.rx, td.tx, td.total { text-align: right; }
 thead th.name { background-color: bisque; }
 thead th.rx { color: white; background-color: crimson; }
-thead th.tx { background-color: mediumseagreen; }
+thead th.tx { color: white; background-color: mediumseagreen; }
 thead th.total { color: white; background-color: steelblue; }
 tbody th { text-align: left; font-weight: normal; }
 tbody tr:nth-child(even) { background-color: whitesmoke; }
