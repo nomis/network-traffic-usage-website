@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0">
-	<xsl:output method="html" version="5.0" encoding="UTF-8" indent="yes"/>
+	<xsl:output method="html" version="5.0" encoding="UTF-8" indent="yes" doctype-system="about:legacy-compat"/>
 	<xsl:template match="traffic">
 		<html>
 			<head>
@@ -76,10 +76,10 @@
 		<table class="usage">
 			<thead>
 				<tr>
-					<th class="name"><xsl:value-of select="@type"/></th>
-					<th class="rx">Receive (<xsl:value-of select="$units_name"/>)</th>
-					<th class="tx">Transmit (<xsl:value-of select="$units_name"/>)</th>
-					<th class="total">Total (<xsl:value-of select="$units_name"/>)</th>
+					<th scope="col" class="name"><xsl:value-of select="@type"/></th>
+					<th scope="col" class="rx">Receive (<xsl:value-of select="$units_name"/>)</th>
+					<th scope="col" class="tx">Transmit (<xsl:value-of select="$units_name"/>)</th>
+					<th scope="col" class="total">Total (<xsl:value-of select="$units_name"/>)</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -89,19 +89,19 @@
 			</tbody>
 			<tfoot>
 				<tr class="summary average">
-					<th class="name">Average</th>
+					<th scope="row" class="name">Average</th>
 					<td class="rx"><xsl:value-of select="format-number(sum(period/@rx_bytes) div count(period/@rx_bytes) div $units_div, '#,##0.00')"/></td>
 					<td class="tx"><xsl:value-of select="format-number(sum(period/@tx_bytes) div count(period/@tx_bytes) div $units_div, '#,##0.00')"/></td>
 					<td class="total"><xsl:value-of select="format-number((sum(period/@rx_bytes) + sum(period/@tx_bytes)) div count(period/@rx_bytes) div $units_div, '#,##0.00')"/></td>
 				</tr>
 				<tr class="summary median">
-					<th class="name">Median</th>
+					<th scope="row" class="name">Median</th>
 					<td class="rx"><xsl:value-of select="format-number($rx_median div $units_div, '#,##0.00')"/></td>
 					<td class="tx"><xsl:value-of select="format-number($tx_median div $units_div, '#,##0.00')"/></td>
 					<td class="total"><xsl:value-of select="format-number(($rx_median + $tx_median) div $units_div, '#,##0.00')"/></td>
 				</tr>
 				<tr class="summary total">
-					<th class="name">Total</th>
+					<th scope="row" class="name">Total</th>
 					<td class="rx"><xsl:value-of select="format-number(sum(period/@rx_bytes) div $units_div, '#,##0.00')"/></td>
 					<td class="tx"><xsl:value-of select="format-number(sum(period/@tx_bytes) div $units_div, '#,##0.00')"/></td>
 					<td class="total"><xsl:value-of select="format-number((sum(period/@rx_bytes) + sum(period/@tx_bytes)) div $units_div, '#,##0.00')"/></td>
@@ -113,7 +113,7 @@
 	<xsl:template match="period">
 		<xsl:param name="units_div"/>
 		<tr>
-			<td class="name"><xsl:value-of select="@name"/></td>
+			<th scope="row" class="name"><xsl:value-of select="@name"/></th>
 			<td class="rx"><xsl:value-of select="format-number(@rx_bytes div $units_div, '#,##0.00')"/></td>
 			<td class="tx"><xsl:value-of select="format-number(@tx_bytes div $units_div, '#,##0.00')"/></td>
 			<td class="total"><xsl:value-of select="format-number((@rx_bytes + @tx_bytes) div $units_div, '#,##0.00')"/></td>
