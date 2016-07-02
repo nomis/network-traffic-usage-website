@@ -15,17 +15,6 @@
 	</xsl:template>
 
 	<xsl:template match="usage">
-		<xsl:variable name="svg_width" select="1000"/>
-		<xsl:variable name="svg_height" select="400"/>
-		<xsl:variable name="text_height" select="16"/>
-		<xsl:variable name="x_label_height" select="30"/>
-		<xsl:variable name="x_tick_height" select="5"/>
-		<xsl:variable name="y_label_width" select="50"/>
-		<xsl:variable name="x_period_width" select="($svg_width - $y_label_width) div count(periods/period)"/>
-		<xsl:variable name="y_steps" select="10"/>
-		<xsl:variable name="y_tick_width" select="5"/>
-		<xsl:variable name="y_step_height" select="($svg_height - $x_label_height) div $y_steps"/>
-		<xsl:variable name="bar_width" select="0.75"/>
 		<xsl:variable name="max_bytes">
 			<xsl:variable name="max_rx_bytes">
 				<xsl:for-each select="periods/period">
@@ -44,6 +33,34 @@
 				<xsl:otherwise><xsl:value-of select="$max_tx_bytes"/></xsl:otherwise>
 			</xsl:choose>
 		</xsl:variable>
+		<xsl:variable name="units_name">
+			<xsl:choose>
+				<xsl:when test="$max_bytes &lt; 10240">B</xsl:when>
+				<xsl:when test="$max_bytes &lt; 10485760">KB</xsl:when>
+				<xsl:when test="$max_bytes &lt; 10737418240">MB</xsl:when>
+				<xsl:otherwise>GB</xsl:otherwise>
+			</xsl:choose>
+		</xsl:variable>
+		<xsl:variable name="units_div">
+			<xsl:choose>
+				<xsl:when test="$units_name = 'B'">1</xsl:when>
+				<xsl:when test="$units_name = 'KB'">1024</xsl:when>
+				<xsl:when test="$units_name = 'MB'">1048576</xsl:when>
+				<xsl:when test="$units_name = 'GB'">1073741824</xsl:when>
+			</xsl:choose>
+		</xsl:variable>
+
+		<xsl:variable name="svg_width" select="1000"/>
+		<xsl:variable name="svg_height" select="400"/>
+		<xsl:variable name="text_height" select="16"/>
+		<xsl:variable name="x_label_height" select="30"/>
+		<xsl:variable name="x_tick_height" select="5"/>
+		<xsl:variable name="y_label_width" select="50"/>
+		<xsl:variable name="x_period_width" select="($svg_width - $y_label_width) div count(periods/period)"/>
+		<xsl:variable name="y_steps" select="10"/>
+		<xsl:variable name="y_tick_width" select="5"/>
+		<xsl:variable name="y_step_height" select="($svg_height - $x_label_height) div $y_steps"/>
+		<xsl:variable name="bar_width" select="0.75"/>
 		<xsl:choose>
 			<xsl:when test="parent">
 				<h1>
@@ -154,7 +171,10 @@
 				</text>
 			</xsl:for-each>
 		</svg>
-		<xsl:apply-templates select="periods"/>
+		<xsl:apply-templates select="periods" mode="table">
+			<xsl:with-param name="units_name"><xsl:value-of select="$units_name"/></xsl:with-param>
+			<xsl:with-param name="units_div"><xsl:value-of select="$units_div"/></xsl:with-param>
+		</xsl:apply-templates>
 	</xsl:template>
 
 	<xsl:template name="median">
@@ -176,29 +196,9 @@
 		<xsl:value-of select="$m1 div ($even + 1)"/>
 	</xsl:template>
 
-	<xsl:template match="periods">
-		<xsl:variable name="max_bytes">
-			<xsl:for-each select="period">
-				<xsl:sort select="@rx_bytes + @tx_bytes" data-type="number" order="descending"/>
-				<xsl:if test="position() = 1"><xsl:value-of select="@rx_bytes + @tx_bytes"/></xsl:if>
-			</xsl:for-each>
-		</xsl:variable>
-		<xsl:variable name="units_name">
-			<xsl:choose>
-				<xsl:when test="$max_bytes &lt; 10240">B</xsl:when>
-				<xsl:when test="$max_bytes &lt; 10485760">KB</xsl:when>
-				<xsl:when test="$max_bytes &lt; 10737418240">MB</xsl:when>
-				<xsl:otherwise>GB</xsl:otherwise>
-			</xsl:choose>
-		</xsl:variable>
-		<xsl:variable name="units_div">
-			<xsl:choose>
-				<xsl:when test="$units_name = 'B'">1</xsl:when>
-				<xsl:when test="$units_name = 'KB'">1024</xsl:when>
-				<xsl:when test="$units_name = 'MB'">1048576</xsl:when>
-				<xsl:when test="$units_name = 'GB'">1073741824</xsl:when>
-			</xsl:choose>
-		</xsl:variable>
+	<xsl:template match="periods" mode="table">
+		<xsl:param name="units_name"/>
+		<xsl:param name="units_div"/>
 		<xsl:variable name="rx_median">
 			<xsl:call-template name="median">
 				<xsl:with-param name="nodes" select="period"/>
@@ -221,7 +221,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				<xsl:apply-templates select="period/@rx_bytes/..">
+				<xsl:apply-templates select="period/@rx_bytes/.." mode="table">
 					<xsl:with-param name="units_div" select="$units_div"/>
 				</xsl:apply-templates>
 			</tbody>
@@ -248,7 +248,7 @@
 		</table>
 	</xsl:template>
 
-	<xsl:template match="period">
+	<xsl:template match="period" mode="table">
 		<xsl:param name="units_div"/>
 		<tr>
 			<th scope="row" class="name">
