@@ -93,7 +93,7 @@ class View:
 			while start.astimezone(tz).replace(tzinfo=None) < end:
 				local_start = start.astimezone(tz)
 				local_end = (start + timedelta(hours=1)).astimezone(tz)
-				self.periods.append(Period(local_start.strftime("%H:%M"), (local_end - timedelta(milliseconds=1)).strftime("%H:%M"), local_start.strftime("%H"), local_start, local_end, None))
+				self.periods.append(Period(local_start.strftime("%H:%M"), (local_start + timedelta(hours=1, milliseconds=-1)).strftime("%H:%M"), local_start.strftime("%H"), local_start, local_end, None))
 				start += timedelta(hours=1)
 
 class Usage:
