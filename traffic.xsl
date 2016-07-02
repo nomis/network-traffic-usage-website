@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0">
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0" exclude-result-prefixes="xsl xsi">
 	<xsl:output method="html" version="5.0" encoding="UTF-8" indent="yes" doctype-system="about:legacy-compat"/>
 	<xsl:template match="traffic">
 		<html>
@@ -15,6 +15,35 @@
 	</xsl:template>
 
 	<xsl:template match="usage">
+		<xsl:variable name="svg_width" select="1000"/>
+		<xsl:variable name="svg_height" select="400"/>
+		<xsl:variable name="text_height" select="16"/>
+		<xsl:variable name="x_label_height" select="30"/>
+		<xsl:variable name="x_tick_height" select="5"/>
+		<xsl:variable name="y_label_width" select="50"/>
+		<xsl:variable name="x_period_width" select="($svg_width - $y_label_width) div count(periods/period)"/>
+		<xsl:variable name="y_steps" select="10"/>
+		<xsl:variable name="y_tick_width" select="5"/>
+		<xsl:variable name="y_step_height" select="($svg_height - $x_label_height) div $y_steps"/>
+		<xsl:variable name="bar_width" select="0.75"/>
+		<xsl:variable name="max_bytes">
+			<xsl:variable name="max_rx_bytes">
+				<xsl:for-each select="periods/period">
+					<xsl:sort select="@rx_bytes" data-type="number" order="descending"/>
+					<xsl:if test="position() = 1"><xsl:value-of select="@rx_bytes"/></xsl:if>
+				</xsl:for-each>
+			</xsl:variable>
+			<xsl:variable name="max_tx_bytes">
+				<xsl:for-each select="periods/period">
+					<xsl:sort select="@tx_bytes" data-type="number" order="descending"/>
+					<xsl:if test="position() = 1"><xsl:value-of select="@tx_bytes"/></xsl:if>
+				</xsl:for-each>
+			</xsl:variable>
+			<xsl:choose>
+				<xsl:when test="$max_rx_bytes > $max_tx_bytes"><xsl:value-of select="$max_rx_bytes"/></xsl:when>
+				<xsl:otherwise><xsl:value-of select="$max_tx_bytes"/></xsl:otherwise>
+			</xsl:choose>
+		</xsl:variable>
 		<xsl:choose>
 			<xsl:when test="parent">
 				<h1>
@@ -29,6 +58,102 @@
 				<h1><xsl:value-of select="@name"/></h1>
 			</xsl:otherwise>
 		</xsl:choose>
+		<svg xmlns="http://www.w3.org/2000/svg" version="1.1">
+			<xsl:attribute name="width"><xsl:value-of select="$svg_width"/></xsl:attribute>
+			<xsl:attribute name="height"><xsl:value-of select="$svg_height + $text_height div 2"/></xsl:attribute>
+			<xsl:attribute name="viewBox" xml:space="preserve">0 <xsl:value-of select="-($text_height div 2)"/> <xsl:value-of select="$svg_width"/> <xsl:value-of select="$svg_height + $text_height div 2"/></xsl:attribute>
+
+			<g stroke="grey" stroke-width="1">
+				<xsl:for-each select="periods/period">
+					<!-- bars -->
+					<xsl:if test="@rx_bytes">
+						<rect fill="crimson">
+							<xsl:attribute name="x"><xsl:value-of select="$y_label_width + 0.5 + floor(($x_period_width div 2) * (2 * position() - 2) + ($x_period_width - ($x_period_width * $bar_width)) div 3)"/></xsl:attribute>
+							<xsl:attribute name="y"><xsl:value-of select="0.5 + ($svg_height - $x_label_height - 1) - floor(($svg_height - $x_label_height - 1) * @rx_bytes div $max_bytes)"/></xsl:attribute>
+							<xsl:attribute name="width"><xsl:value-of select="floor($x_period_width div 2 * $bar_width)"/></xsl:attribute>
+							<xsl:attribute name="height"><xsl:value-of select="floor(($svg_height - $x_label_height - 1) * @rx_bytes div $max_bytes)"/></xsl:attribute>
+						</rect>
+					</xsl:if>
+					<xsl:if test="@tx_bytes">
+						<rect fill="mediumseagreen">
+							<xsl:attribute name="x"><xsl:value-of select="$y_label_width + 0.5 + floor(($x_period_width div 2) * (2 * position() - 1) + ($x_period_width - ($x_period_width * $bar_width)) div 6)"/></xsl:attribute>
+							<xsl:attribute name="y"><xsl:value-of select="0.5 + ($svg_height - $x_label_height - 1) - floor(($svg_height - $x_label_height - 1) * @tx_bytes div $max_bytes)"/></xsl:attribute>
+							<xsl:attribute name="width"><xsl:value-of select="floor($x_period_width div 2 * $bar_width)"/></xsl:attribute>
+							<xsl:attribute name="height"><xsl:value-of select="floor(($svg_height - $x_label_height - 1) * @tx_bytes div $max_bytes)"/></xsl:attribute>
+						</rect>
+					</xsl:if>
+				</xsl:for-each>
+			</g>
+
+			<g stroke="black" stroke-width="1">
+				<!-- X axis -->
+				<line>
+					<xsl:attribute name="x1"><xsl:value-of select="$y_label_width"/></xsl:attribute>
+					<xsl:attribute name="x2"><xsl:value-of select="$svg_width"/></xsl:attribute>
+					<xsl:attribute name="y1"><xsl:value-of select="$svg_height - $x_label_height - 0.5"/></xsl:attribute>
+					<xsl:attribute name="y2"><xsl:value-of select="$svg_height - $x_label_height - 0.5"/></xsl:attribute>
+				</line>
+
+				<!-- Y axis -->
+				<line stroke="black" stroke-width="1">
+					<xsl:attribute name="x1"><xsl:value-of select="$y_label_width - 0.5"/></xsl:attribute>
+					<xsl:attribute name="x2"><xsl:value-of select="$y_label_width - 0.5"/></xsl:attribute>
+					<xsl:attribute name="y1">0</xsl:attribute>
+					<xsl:attribute name="y2"><xsl:value-of select="$svg_height - $x_label_height"/></xsl:attribute>
+				</line>
+
+				<!-- X ticks -->
+				<line>
+					<xsl:attribute name="x1"><xsl:value-of select="$y_label_width - 0.5"/></xsl:attribute>
+					<xsl:attribute name="x2"><xsl:value-of select="$y_label_width - 0.5"/></xsl:attribute>
+					<xsl:attribute name="y1"><xsl:value-of select="$svg_height - $x_label_height - $x_tick_height div 2 - 0.5"/></xsl:attribute>
+					<xsl:attribute name="y2"><xsl:value-of select="$svg_height - $x_label_height + $x_tick_height div 2 - 0.5"/></xsl:attribute>
+				</line>
+				<xsl:for-each select="periods/period">
+					<line>
+						<xsl:attribute name="x1"><xsl:value-of select="$y_label_width - 0.5 + floor($x_period_width * position())"/></xsl:attribute>
+						<xsl:attribute name="x2"><xsl:value-of select="$y_label_width - 0.5 + floor($x_period_width * position())"/></xsl:attribute>
+						<xsl:attribute name="y1"><xsl:value-of select="$svg_height - $x_label_height - $x_tick_height div 2 - 0.5"/></xsl:attribute>
+						<xsl:attribute name="y2"><xsl:value-of select="$svg_height - $x_label_height + $x_tick_height div 2 - 0.5"/></xsl:attribute>
+					</line>
+				</xsl:for-each>
+
+				<!-- Y ticks -->
+				<xsl:for-each select="(//node())[$y_steps >= position() - 1]">
+					<line>
+						<xsl:attribute name="x1"><xsl:value-of select="$y_label_width - $y_tick_width div 2 - 0.5"/></xsl:attribute>
+						<xsl:attribute name="x2"><xsl:value-of select="$y_label_width + $y_tick_width div 2 - 0.5"/></xsl:attribute>
+						<xsl:attribute name="y1"><xsl:value-of select="floor($y_step_height * (position() - 1)) - 0.5"/></xsl:attribute>
+						<xsl:attribute name="y2"><xsl:value-of select="floor($y_step_height * (position() - 1)) - 0.5"/></xsl:attribute>
+					</line>
+				</xsl:for-each>
+			</g>
+
+			<!-- X axis label -->
+			<xsl:for-each select="periods/period">
+				<text text-anchor="middle" font-size="16" dy="0.3em">
+					<xsl:attribute name="x"><xsl:value-of select="$y_label_width - 0.5 + floor($x_period_width * (position() - 0.5))"/></xsl:attribute>
+					<xsl:attribute name="y"><xsl:value-of select="$svg_height - $x_label_height div 2"/></xsl:attribute>
+					<xsl:choose>
+						<xsl:when test="@short_name">
+							<xsl:value-of select="@short_name"/>
+						</xsl:when>
+						<xsl:otherwise>
+							<xsl:value-of select="@name"/>
+						</xsl:otherwise>
+					</xsl:choose>
+				</text>
+			</xsl:for-each>
+
+			<!-- Y axis label -->
+			<xsl:for-each select="(//node())[$y_steps >= position() - 1]">
+				<text text-anchor="end" font-size="16" dy="0.3em">
+					<xsl:attribute name="x"><xsl:value-of select="$y_label_width - $y_tick_width"/></xsl:attribute>
+					<xsl:attribute name="y"><xsl:value-of select="floor($y_step_height * (position() - 1))"/></xsl:attribute>
+					<xsl:value-of select="$y_steps - (position() - 1)"/>
+				</text>
+			</xsl:for-each>
+		</svg>
 		<xsl:apply-templates select="periods"/>
 	</xsl:template>
 
@@ -55,7 +180,7 @@
 		<xsl:variable name="max_bytes">
 			<xsl:for-each select="period">
 				<xsl:sort select="@rx_bytes + @tx_bytes" data-type="number" order="descending"/>
-				<xsl:if test="position() = 1"><xsl:value-of select="@rx_bytes"/></xsl:if>
+				<xsl:if test="position() = 1"><xsl:value-of select="@rx_bytes + @tx_bytes"/></xsl:if>
 			</xsl:for-each>
 		</xsl:variable>
 		<xsl:variable name="units_name">

@@ -1,7 +1,7 @@
 html { font-family: serif; }
-body { color: black; background-color: white; }
+body { color: black; background-color: white; margin: 0 auto; width: 1000px; }
 h1 { text-align: center; }
-table { border: 1px outset grey; margin: 0 auto; width: 50%; }
+table { border: 1px outset grey; width: 100%; }
 th, td { border: thin inset grey; }
 td.rx, td.tx, td.total { text-align: right; }
 thead th.name { background-color: bisque; }

@@ -35,7 +35,7 @@ def getconn(pool, max_conns):
                         attempts -= 1
         return conn
 
-Period = collections.namedtuple("Period", ["start_name", "end_name", "start_ts", "end_ts", "uri"])
+Period = collections.namedtuple("Period", ["start_name", "end_name", "short_name", "start_ts", "end_ts", "uri"])
 
 class View:
 	def __init__(self, uri):
@@ -67,7 +67,7 @@ class View:
 			for month in range(1, 13):
 				local_start = tz.localize(datetime(year, month, 1))
 				local_end = tz.localize(datetime(year if month < 12 else year + 1, month + 1 if month < 12 else 1, 1))
-				self.periods.append(Period(local_start.strftime("%B"), None, local_start, local_end, "{0}{1:04d}{2:02d}".format(base_uri, year, local_start.month)))
+				self.periods.append(Period(local_start.strftime("%B"), None, local_start.strftime("%b"), local_start, local_end, "{0}{1:04d}{2:02d}".format(base_uri, year, local_start.month)))
 		elif len(self.date) == 6:
 			self.period_type = "Day"
 			year = int(self.date[0:4])
@@ -79,7 +79,7 @@ class View:
 			while start < end:
 				local_start = tz.localize(start)
 				local_end = tz.localize(start + timedelta(days=1))
-				self.periods.append(Period(local_start.strftime("%d"), None, local_start, local_end, "{0}{1:04d}{2:02d}{3:02d}".format(base_uri, year, month, local_start.day)))
+				self.periods.append(Period(local_start.strftime("%d"), None, None, local_start, local_end, "{0}{1:04d}{2:02d}{3:02d}".format(base_uri, year, month, local_start.day)))
 				start += timedelta(days=1)
 		elif len(self.date) == 8:
 			self.period_type = "Hour"
@@ -93,7 +93,7 @@ class View:
 			while start.astimezone(tz).replace(tzinfo=None) < end:
 				local_start = start.astimezone(tz)
 				local_end = (start + timedelta(hours=1)).astimezone(tz)
-				self.periods.append(Period(local_start.strftime("%H:%M"), (local_end - timedelta(milliseconds=1)).strftime("%H:%M"), local_start, local_end, None))
+				self.periods.append(Period(local_start.strftime("%H:%M"), (local_end - timedelta(milliseconds=1)).strftime("%H:%M"), local_start.strftime("%H"), local_start, local_end, None))
 				start += timedelta(hours=1)
 
 class Usage:
@@ -151,6 +151,8 @@ class Usage:
 		pos = 0
 		for period in self.view.periods:
 			attrs = { "name": u"–".join(filter(None, [period.start_name, period.end_name])) }
+			if period.short_name:
+				attrs["short_name"] = period.short_name
 			if period.uri:
 				attrs["uri"] = period.uri
 			attrs["from"] = period.start_ts.isoformat()
