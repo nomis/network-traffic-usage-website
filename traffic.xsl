@@ -15,7 +15,20 @@
 	</xsl:template>
 
 	<xsl:template match="usage">
-		<h1><xsl:value-of select="@name"/></h1>
+		<xsl:choose>
+			<xsl:when test="parent">
+				<h1>
+					<a>
+						<xsl:attribute name="href"><xsl:value-of select="parent/@uri"/></xsl:attribute>
+						<xsl:value-of select="substring(@name, 1, string-length(parent/@name))"/>
+					</a>
+					<xsl:value-of select="substring(@name, string-length(parent/@name) + 1)"/>
+				</h1>
+			</xsl:when>
+			<xsl:otherwise>
+				<h1><xsl:value-of select="@name"/></h1>
+			</xsl:otherwise>
+		</xsl:choose>
 		<xsl:apply-templates select="periods"/>
 	</xsl:template>
 
@@ -113,7 +126,19 @@
 	<xsl:template match="period">
 		<xsl:param name="units_div"/>
 		<tr>
-			<th scope="row" class="name"><xsl:value-of select="@name"/></th>
+			<th scope="row" class="name">
+				<xsl:choose>
+					<xsl:when test="@uri">
+						<a>
+							<xsl:attribute name="href"><xsl:value-of select="@uri"/></xsl:attribute>
+							<xsl:value-of select="@name"/>
+						</a>
+					</xsl:when>
+					<xsl:otherwise>
+						<xsl:value-of select="@name"/>
+					</xsl:otherwise>
+				</xsl:choose>
+			</th>
 			<td class="rx"><xsl:value-of select="format-number(@rx_bytes div $units_div, '#,##0.00')"/></td>
 			<td class="tx"><xsl:value-of select="format-number(@tx_bytes div $units_div, '#,##0.00')"/></td>
 			<td class="total"><xsl:value-of select="format-number((@rx_bytes + @tx_bytes) div $units_div, '#,##0.00')"/></td>
