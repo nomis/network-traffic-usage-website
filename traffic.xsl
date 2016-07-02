@@ -86,12 +86,20 @@
 			<xsl:for-each select="$nodes/@*[local-name()=$attr]">
 				<xsl:sort data-type="number"/>
 				<xsl:if test="position() = $middle">
-					<xsl:value-of select=". + ($even * ../following-sibling::*[1]/@*[local-name()=$attr])"/>
+					<xsl:value-of select="."/>
+				</xsl:if>
+			</xsl:for-each>
+		</xsl:variable>
+		<xsl:variable name="m2">
+			<xsl:for-each select="$nodes/@*[local-name()=$attr]">
+				<xsl:sort data-type="number"/>
+				<xsl:if test="position() = $middle + 1">
+					<xsl:value-of select="."/>
 				</xsl:if>
 			</xsl:for-each>
 		</xsl:variable>
 
-		<xsl:value-of select="$m1 div ($even + 1)"/>
+		<xsl:value-of select="($m1 + $m2) div ($even + 1)"/>
 	</xsl:template>
 
 	<xsl:template match="periods" mode="table">
@@ -131,6 +139,8 @@
 						<td class="tx"><xsl:value-of select="format-number(sum(period/@tx_bytes) div count(period/@tx_bytes) div $units_div, '#,##0.00')"/></td>
 						<td class="total"><xsl:value-of select="format-number((sum(period/@rx_bytes) + sum(period/@tx_bytes)) div count(period/@rx_bytes) div $units_div, '#,##0.00')"/></td>
 					</tr>
+				</xsl:if>
+				<xsl:if test="count(period/@rx_bytes) > 2">
 					<tr class="summary median">
 						<th scope="row" class="name">Median</th>
 						<td class="rx"><xsl:value-of select="format-number($rx_median div $units_div, '#,##0.00')"/></td>
