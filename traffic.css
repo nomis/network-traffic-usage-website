@@ -1,5 +1,5 @@
 html { font-family: serif; }
-body { color: black; background-color: white; margin: 0 auto; width: 1000px; }
+body { color: black; background-color: white; margin: 0 auto 1em auto; width: 1000px; }
 h1 { text-align: center; }
 table { border: 1px outset grey; width: 100%; }
 th, td { border: thin inset grey; }
