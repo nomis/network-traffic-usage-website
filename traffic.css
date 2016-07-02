@@ -1,2 +1,11 @@
-table.usage { border: 1px outset grey; }
-table.usage th, table.usage td { border: thin inset grey; }
+html { font-family: serif; }
+body { color: black; background-color: white; }
+h1 { text-align: center; }
+table { border: 1px outset grey; margin: 0 auto; width: 50%; }
+table th, table td { border: thin inset grey; }
+thead th.name { background-color: bisque; }
+thead th.rx { color: white; background-color: crimson; }
+thead th.tx { background-color: mediumseagreen; }
+thead th.total { color: white; background-color: steelblue; }
+td.rx, td.tx, td.total { text-align: right; }
+tfoot th { text-align: left; }
