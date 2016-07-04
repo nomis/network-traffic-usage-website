@@ -38,9 +38,11 @@ def getconn(pool, max_conns):
 Period = collections.namedtuple("Period", ["start_name", "end_name", "short_name", "start_ts", "end_ts", "uri"])
 
 class View:
-	def __init__(self, uri):
+	def __init__(self, req):
 		self.device = config["device"]
+		self.mode = req.GET.get("mode", "normal")
 
+		uri = req.environ["REQUEST_URI"].split("?")[0]
 		uri = uri[1:].split("/")
 		if len(uri) == 1:
 			self.date = uri[0]
@@ -52,6 +54,9 @@ class View:
 
 		if len(self.date) not in [0, 4, 6, 8] or not date_re.match(self.date):
 			raise webob.exc.HTTPNotFound("Invalid date format")
+
+		if self.mode not in ["normal"]:
+			raise webob.exc.HTTPNotFound("Invalid mode")
 
 		if not self.date:
 			self.date = "{0:04d}".format(datetime.now().year)
@@ -142,9 +147,11 @@ class Usage:
 			pool.putconn(db)
 
 	def output(self, doc):
+		query_string = "" if self.view.mode == "normal" else "?mode=" + self.view.mode
+
 		doc.startElement("usage", { "name": self.view.name })
 		if self.view.parent:
-			doc.startElement("parent", { "name": self.view.parent["name"], "uri": self.view.parent["uri"] })
+			doc.startElement("parent", { "name": self.view.parent["name"], "uri": self.view.parent["uri"] + query_string })
 			doc.endElement("parent")
 
 		doc.startElement("periods", { "type": self.view.period_type, "query_time": str(self.query_time) })
@@ -154,7 +161,7 @@ class Usage:
 			if period.short_name:
 				attrs["short_name"] = period.short_name
 			if period.uri:
-				attrs["uri"] = period.uri
+				attrs["uri"] = period.uri + query_string
 			attrs["from"] = period.start_ts.isoformat()
 			attrs["to"] = period.end_ts.isoformat()
 
@@ -175,9 +182,7 @@ def application(environ, start_response):
 	try:
 		req = webob.Request(environ)
 		res = webob.Response(content_type="application/xml")
-
-		uri = req.environ["REQUEST_URI"]
-		usage = Usage(View(uri))
+		usage = Usage(View(req))
 
 		f = res.body_file
 		doc = XMLGenerator(f, "UTF-8")
