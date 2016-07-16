@@ -162,8 +162,8 @@ class Usage:
 				attrs["short_name"] = period.short_name
 			if period.uri:
 				attrs["uri"] = period.uri + query_string
-			attrs["from"] = period.start_ts.isoformat()
-			attrs["to"] = period.end_ts.isoformat()
+#			attrs["from"] = period.start_ts.isoformat()
+#			attrs["to"] = period.end_ts.isoformat()
 
 			if len(self.bp) > pos and self.bp[pos]["start"] == period.start_ts:
 				if self.bp[pos]["rx_bytes"] is not None:
