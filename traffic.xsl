@@ -99,7 +99,14 @@
 			</xsl:for-each>
 		</xsl:variable>
 
-		<xsl:value-of select="($m1 + $m2) div ($even + 1)"/>
+		<xsl:choose>
+			<xsl:when test="$even">
+				<xsl:value-of select="($m1 + $m2) div 2"/>
+			</xsl:when>
+			<xsl:otherwise>
+				<xsl:value-of select="$m1"/>
+			</xsl:otherwise>
+		</xsl:choose>
 	</xsl:template>
 
 	<xsl:template match="periods" mode="table">
