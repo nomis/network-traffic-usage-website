@@ -1,0 +1,3 @@
+dsn: dbname=net_stats
+
+device: wan-internet0
