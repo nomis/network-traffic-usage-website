@@ -151,7 +151,7 @@ class Usage:
 					+ "))::bigint AS tx_packets"
 				+ " FROM bp_stats bp, unnest(%(start)s, %(stop)s) AS period(start, stop)"
 				+ " WHERE intf = (SELECT id FROM intf_name WHERE name=%(device)s) "
-				+ " AND ((bp.start >= period.start and bp.start < period.start) or (bp.stop >= period.start and bp.stop < period.stop))"
+				+ " AND ((period.start <= bp.start AND period.stop > bp.start) OR (period.start < bp.stop AND period.stop > bp.stop))"
 				+ " GROUP BY period.start"
 				+ " ORDER BY period.start",
 				{ "device": view.device, "start": start_periods, "stop": end_periods })
