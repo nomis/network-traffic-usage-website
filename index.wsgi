@@ -1,7 +1,7 @@
 # coding: utf8
 #
 # network-traffic-usage-website - Display network traffic usage using XSLT
-# Copyright 2016,2021  Simon Arlott
+# Copyright 2016,2021,2023  Simon Arlott
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -174,7 +174,7 @@ class Usage:
 		doc.startElement("periods", { "type": self.view.period_type, "query_time": str(self.query_time) })
 		pos = 0
 		for period in self.view.periods:
-			attrs = { "name": u"–".join(filter(None, [period.start_name, period.end_name])) }
+			attrs = { "name": "–".join(filter(None, [period.start_name, period.end_name])) }
 			if period.short_name:
 				attrs["short_name"] = period.short_name
 			if period.uri:
@@ -210,5 +210,5 @@ def application(environ, start_response):
 		doc.endElement("traffic")
 
 		return res(environ, start_response)
-	except webob.exc.HTTPException, e:
+	except webob.exc.HTTPException as e:
 		return e(environ, start_response)
