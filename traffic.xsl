@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 network-traffic-usage-website - Display network traffic usage using XSLT
-Copyright 2016,2021  Simon Arlott
+Copyright 2016,2021,2025  Simon Arlott
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -52,18 +52,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 		</xsl:variable>
 		<xsl:variable name="units_name">
 			<xsl:choose>
-				<xsl:when test="$max_bytes &lt; 10240">B</xsl:when>
-				<xsl:when test="$max_bytes &lt; 10485760">KB</xsl:when>
-				<xsl:when test="$max_bytes &lt; 10737418240">MB</xsl:when>
-				<xsl:otherwise>GB</xsl:otherwise>
+				<xsl:when test="$max_bytes &lt; 10000">B</xsl:when>
+				<xsl:when test="$max_bytes &lt; 10000000">KB</xsl:when>
+				<xsl:when test="$max_bytes &lt; 10000000000">MB</xsl:when>
+				<xsl:when test="$max_bytes &lt; 10000000000000">GB</xsl:when>
+				<xsl:otherwise>TB</xsl:otherwise>
 			</xsl:choose>
 		</xsl:variable>
 		<xsl:variable name="units_div">
 			<xsl:choose>
 				<xsl:when test="$units_name = 'B'">1</xsl:when>
-				<xsl:when test="$units_name = 'KB'">1024</xsl:when>
-				<xsl:when test="$units_name = 'MB'">1048576</xsl:when>
-				<xsl:when test="$units_name = 'GB'">1073741824</xsl:when>
+				<xsl:when test="$units_name = 'KB'">1000</xsl:when>
+				<xsl:when test="$units_name = 'MB'">1000000</xsl:when>
+				<xsl:when test="$units_name = 'GB'">1000000000</xsl:when>
+				<xsl:when test="$units_name = 'TB'">1000000000000</xsl:when>
 			</xsl:choose>
 		</xsl:variable>
 
